@@ -13,7 +13,6 @@ public class assign2 {
 
         int count = args.length;
 
-
         Map<String, String> input = new HashMap<String, String>();
 
         List<String> fileNames = new ArrayList<>();
