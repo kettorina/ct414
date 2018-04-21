@@ -1,3 +1,4 @@
+
 package assignment2;
 
 import java.io.BufferedReader;
@@ -10,6 +11,10 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+
+import assignment2.assign2.ReduceCallback;
 
 public class assign2group {
 
@@ -19,6 +24,7 @@ public class assign2group {
         // INPUT:
         ///////////
 
+        ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(Integer.parseInt(args[0]));
 
         int count = args.length;
 
@@ -101,20 +107,46 @@ public class assign2group {
             // GROUP:
             long startTime = System.nanoTime();
             Map<String, List<String>> groupedItems = new HashMap<String, List<String>>();
+            
+            final GroupCallback<String, String, Integer> groupCallback = new GroupCallback<String, String, Integer>() {
+                @Override
+                public synchronized void groupDone(String k, Map<String, Integer> v) {
+                    output.put(k, v);
+                }
+            };
 
             Iterator<MappedItem> mappedIter = mappedItems.iterator();
+            public Integer wordCounter = 0;
+            		
+            while(mappedIter.hasNext()) {
+            	wordCounter ++;
+            }
+            // Word count / #threads to see how many words go into each chunk
+            public Integer chunk = wordCounter / args[0]
+            
+            
             while(mappedIter.hasNext()) {
                 MappedItem item = mappedIter.next();
                 String word = item.getWord();
                 String file = item.getFile();
-                List<String> list = groupedItems.get(word);
+                List<String> list = mappedItems.get(word);
                 if (list == null) {
                     list = new LinkedList<String>();
-                    groupedItems.put(word, list);
+                    mappedItems.put(word, list);
                 }
+                
+                executor.submit(() -> {
+                    group(word, list, groupCallback);
+                });
+                
                 list.add(file);
             }
             long stopTime = System.nanoTime();
+            
+            executor.shutdown();
+            while (!executor.isTerminated()) ;
+            
+            
             System.out.println(stopTime - startTime + " nanoseconds");
 
             // REDUCE:
@@ -181,7 +213,17 @@ public class assign2group {
 
         public void mapDone(E key, List<V> values);
     }
+    
+    public static interface GroupCallback<E, V> {
+//to do
+        public void groupDone(E key, List<V> values);
+    }
 
+    public static interface ReduceCallback<E, K, V> {
+
+        public void reduceDone(E e, Map<K,V> results);
+    }
+    
     public static void map(String file, String contents, MapCallback<String, MappedItem> callback) {
         String[] words = contents.trim().split("\\s+");
         List<MappedItem> results = new ArrayList<MappedItem>(words.length);
@@ -191,9 +233,20 @@ public class assign2group {
         callback.mapDone(file, results);
     }
 
-    public static interface ReduceCallback<E, K, V> {
-
-        public void reduceDone(E e, Map<K,V> results);
+    public static void group(List<String> mappedItems, Map< String, List<String>, GroupCallback<String> >, List<String> callback) {
+    	//to do
+    	
+    			List<MappedItem> = 
+    	        Map<String, List<String>> groupedList = new HashMap<String, List<String>>();
+    	        for(String file: filesThatHaveWord) {
+    	            Integer occurrences = groupedList.get(file);
+    	            if (occurrences == null) {
+    	            	groupedList.put(file, 1);
+    	            } else {
+    	            	groupedList.put(file, occurrences.intValue() + 1);
+    	            }
+    	        }
+    	        callback.reduceDone(word, reducedList);
     }
 
     public static void reduce(String word, List<String> list, ReduceCallback<String, String, Integer> callback) {
@@ -209,7 +262,7 @@ public class assign2group {
         }
         callback.reduceDone(word, reducedList);
     }
-
+    
     private static class MappedItem {
 
         private final String word;
