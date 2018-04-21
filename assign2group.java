@@ -24,7 +24,7 @@ public class assign2group {
         // INPUT:
         ///////////
 
-        ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(Integer.parseInt(args[0]));
+
 
         int count = args.length;
 
@@ -61,129 +61,133 @@ public class assign2group {
             ioException.printStackTrace();
         }
 
+        ArrayList times = new ArrayList();
+        System.out.println("Number of threads: " + Integer.parseInt(args[0]));
 
-        // APPROACH #3: Distributed MapReduce
-        {
-            final Map<String, Map<String, Integer>> output = new HashMap<String, Map<String, Integer>>();
+        for(int i = 0; i<10; i++) {
+            ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newFixedThreadPool(Integer.parseInt(args[0]));
 
-            // MAP:
+            int startTime = (int) System.currentTimeMillis();
 
-            final List<MappedItem> mappedItems = new LinkedList<MappedItem>();
+            // APPROACH #3: Distributed MapReduce
+            {
+                final Map<String, Map<String, Integer>> output = new HashMap<String, Map<String, Integer>>();
 
-            final MapCallback<String, MappedItem> mapCallback = new MapCallback<String, MappedItem>() {
-                @Override
-                public synchronized void mapDone(String file, List<MappedItem> results) {
-                    mappedItems.addAll(results);
-                }
-            };
+                // MAP:
 
-            List<Thread> mapCluster = new ArrayList<Thread>(input.size());
+                final List<MappedItem> mappedItems = new LinkedList<MappedItem>();
 
-            Iterator<Map.Entry<String, String>> inputIter = input.entrySet().iterator();
-            while(inputIter.hasNext()) {
-                Map.Entry<String, String> entry = inputIter.next();
-                final String file = entry.getKey();
-                final String contents = entry.getValue();
-
-                Thread t = new Thread(new Runnable() {
+                final MapCallback<String, MappedItem> mapCallback = new MapCallback<String, MappedItem>() {
                     @Override
-                    public void run() {
-                        map(file, contents, mapCallback);
+                    public synchronized void mapDone(String file, List<MappedItem> results) {
+                        mappedItems.addAll(results);
                     }
-                });
-                mapCluster.add(t);
-                t.start();
-            }
+                };
 
-            // wait for mapping phase to be over:
-            for(Thread t : mapCluster) {
-                try {
-                    t.join();
-                } catch(InterruptedException e) {
-                    throw new RuntimeException(e);
+                List<Thread> mapCluster = new ArrayList<Thread>(input.size());
+
+                Iterator<Map.Entry<String, String>> inputIter = input.entrySet().iterator();
+                while (inputIter.hasNext()) {
+                    Map.Entry<String, String> entry = inputIter.next();
+                    final String file = entry.getKey();
+                    final String contents = entry.getValue();
+
+                    Thread t = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            map(file, contents, mapCallback);
+                        }
+                    });
+                    mapCluster.add(t);
+                    t.start();
                 }
-            }
 
-            // GROUP:
-            long startTime = System.nanoTime();
-            Map<String, List<String>> groupedItems = new HashMap<String, List<String>>();
-            
-            final GroupCallback<Map<String, List<String>>> groupCallback = new GroupCallback<Map<String, List<String>>>() {
-
-                @Override
-                public synchronized void groupDone(String k , List<String> v) {
-                    groupedItems.put(k, v);
+                // wait for mapping phase to be over:
+                for (Thread t : mapCluster) {
+                    try {
+                        t.join();
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
-            };
 
-            Iterator<MappedItem> counterIter = mappedItems.iterator();
-            int wordCounter = 0;
-            		
-            while(counterIter.hasNext()) {
-                counterIter.next();
-            	wordCounter ++;
-            }
-            // Word count / #threads to see how many words go into each chunk
-            int chunk = (int) Math.floor(wordCounter / Integer.parseInt(args[0]));
+                // GROUP:
+                Map<String, List<String>> groupedItems = new HashMap<String, List<String>>();
 
-            Iterator<MappedItem> mappedIter = mappedItems.iterator();
-            while(mappedIter.hasNext()) {
-                MappedItem item = mappedIter.next();
-                String word = item.getWord();
-                String file = item.getFile();
-                List<String> list = groupedItems.get(word);
-                
-                executor.execute(() -> {
-                    group(word, file, list, groupCallback);
-                });
+                final GroupCallback<Map<String, List<String>>> groupCallback = new GroupCallback<Map<String, List<String>>>() {
 
-            }
-            long stopTime = System.nanoTime();
-            
-            executor.shutdown();
-            while (!executor.isTerminated()) ;
-            
-            
-            System.out.println(stopTime - startTime + " nanoseconds");
-
-            // REDUCE:
-
-            final ReduceCallback<String, String, Integer> reduceCallback = new ReduceCallback<String, String, Integer>() {
-                @Override
-                public synchronized void reduceDone(String k, Map<String, Integer> v) {
-                    output.put(k, v);
-                }
-            };
-
-            List<Thread> reduceCluster = new ArrayList<Thread>(groupedItems.size());
-
-            Iterator<Map.Entry<String, List<String>>> groupedIter = groupedItems.entrySet().iterator();
-            while(groupedIter.hasNext()) {
-                Map.Entry<String, List<String>> entry = groupedIter.next();
-                final String word = entry.getKey();
-                final List<String> list = entry.getValue();
-
-                Thread t = new Thread(new Runnable() {
                     @Override
-                    public void run() {
-                        reduce(word, list, reduceCallback);
+                    public synchronized void groupDone(String k, List<String> v) {
+                        groupedItems.put(k, v);
                     }
-                });
-                reduceCluster.add(t);
-                t.start();
-            }
+                };
 
-            // wait for reducing phase to be over:
-            for(Thread t : reduceCluster) {
-                try {
-                    t.join();
-                } catch(InterruptedException e) {
-                    throw new RuntimeException(e);
+
+                Iterator<MappedItem> mappedIter = mappedItems.iterator();
+                while (mappedIter.hasNext()) {
+                    MappedItem item = mappedIter.next();
+                    String word = item.getWord();
+                    String file = item.getFile();
+                    List<String> list = groupedItems.get(word);
+
+                    executor.execute(() -> {
+                        group(word, file, list, groupCallback);
+                    });
+
                 }
-            }
 
-            System.out.println(output);
+                executor.shutdown();
+                while (!executor.isTerminated()) ;
+
+
+                // REDUCE:
+
+                final ReduceCallback<String, String, Integer> reduceCallback = new ReduceCallback<String, String, Integer>() {
+                    @Override
+                    public synchronized void reduceDone(String k, Map<String, Integer> v) {
+                        output.put(k, v);
+                    }
+                };
+
+                List<Thread> reduceCluster = new ArrayList<Thread>(groupedItems.size());
+
+                Iterator<Map.Entry<String, List<String>>> groupedIter = groupedItems.entrySet().iterator();
+                while (groupedIter.hasNext()) {
+                    Map.Entry<String, List<String>> entry = groupedIter.next();
+                    final String word = entry.getKey();
+                    final List<String> list = entry.getValue();
+
+                    Thread t = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            reduce(word, list, reduceCallback);
+                        }
+                    });
+                    reduceCluster.add(t);
+                    t.start();
+                }
+
+                // wait for reducing phase to be over:
+                for (Thread t : reduceCluster) {
+                    try {
+                        t.join();
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
+                int endTime = (int) System.currentTimeMillis();
+                int execution_time = (endTime - startTime);
+                times.add(execution_time);
+                //System.out.println(output);
+                System.out.println("Execution time: " + execution_time);
+            }
         }
+        int total = 0;
+        for(int i = 0; i < times.size(); i++){
+            total += (int)times.get(i);
+        }
+        System.out.println("Average execution time: "+(total/times.size()));
     }
 
     public static void map(String file, String contents, List<MappedItem> mappedItems) {
@@ -241,6 +245,7 @@ public class assign2group {
     public static void reduce(String word, List<String> list, ReduceCallback<String, String, Integer> callback) {
 
         Map<String, Integer> reducedList = new HashMap<String, Integer>();
+
         for(String file: list) {
             Integer occurrences = reducedList.get(file);
             if (occurrences == null) {
