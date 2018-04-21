@@ -108,7 +108,7 @@ public class assign2group {
             long startTime = System.nanoTime();
             Map<String, List<String>> groupedItems = new HashMap<String, List<String>>();
             
-            final GroupCallback<String, String, Integer> groupCallback = new GroupCallback<String, String, Integer>() {
+            final GroupCallback<List<MappedItem>> groupCallback = new GroupCallback<List<MappedItem>>() {
                 @Override
                 public synchronized void groupDone(String k, Map<String, Integer> v) {
                     output.put(k, v);
@@ -116,14 +116,13 @@ public class assign2group {
             };
 
             Iterator<MappedItem> mappedIter = mappedItems.iterator();
-            public Integer wordCounter = 0;
+            int wordCounter = 0;
             		
             while(mappedIter.hasNext()) {
             	wordCounter ++;
             }
             // Word count / #threads to see how many words go into each chunk
-            public Integer chunk = wordCounter / args[0]
-            
+            int chunk = (int) Math.floor(wordCounter / Integer.parseInt(args[0]));
             
             while(mappedIter.hasNext()) {
                 MappedItem item = mappedIter.next();
@@ -233,7 +232,7 @@ public class assign2group {
         callback.mapDone(file, results);
     }
 
-    public static void group(List<String> mappedItems, Map< String, List<String>, GroupCallback<String> >, List<String> callback) {
+    public static void group(List<String> mappedItems, Map< String, List<String>, GroupCallback<List<MappedItem>>, List<String> callback) {
     	//to do
     	
     			List<MappedItem> = 
