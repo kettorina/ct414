@@ -109,36 +109,34 @@ public class assign2group {
             Map<String, List<String>> groupedItems = new HashMap<String, List<String>>();
             
             final GroupCallback<Map<String, List<String>>> groupCallback = new GroupCallback<Map<String, List<String>>>() {
+
                 @Override
                 public synchronized void groupDone(String k , List<String> v) {
-                    output.put(k, v);
+                    groupedItems.put(k, v);
                 }
             };
 
-            Iterator<MappedItem> mappedIter = mappedItems.iterator();
+            Iterator<MappedItem> counterIter = mappedItems.iterator();
             int wordCounter = 0;
             		
-            while(mappedIter.hasNext()) {
+            while(counterIter.hasNext()) {
+                counterIter.next();
             	wordCounter ++;
             }
             // Word count / #threads to see how many words go into each chunk
             int chunk = (int) Math.floor(wordCounter / Integer.parseInt(args[0]));
-            
+
+            Iterator<MappedItem> mappedIter = mappedItems.iterator();
             while(mappedIter.hasNext()) {
                 MappedItem item = mappedIter.next();
                 String word = item.getWord();
                 String file = item.getFile();
                 List<String> list = groupedItems.get(word);
-                if (list == null) {
-                    list = new LinkedList<String>();
-                    groupedItems.put(word, list);
-                }
                 
-                executor.submit(() -> {
-                    group(word, list, groupCallback);
+                executor.execute(() -> {
+                    group(word, file, list, groupCallback);
                 });
-                
-                list.add(file);
+
             }
             long stopTime = System.nanoTime();
             
@@ -189,7 +187,7 @@ public class assign2group {
     }
 
     public static void map(String file, String contents, List<MappedItem> mappedItems) {
-        String[] words = contents.trim().split("\\s+");
+        String[] words = contents.replaceAll("[^a-zA-Z ]", " ").toLowerCase().split("\\s+");
         for(String word: words) {
             mappedItems.add(new MappedItem(word, file));
         }
@@ -212,11 +210,6 @@ public class assign2group {
 
         public void mapDone(E key, List<V> values);
     }
-    
-    public static interface GroupCallback<E, V> {
-//to do
-        public void groupDone(E key, List<V> values);
-    }
 
     public static interface ReduceCallback<E, K, V> {
 
@@ -232,20 +225,17 @@ public class assign2group {
         callback.mapDone(file, results);
     }
 
-    public static void group(List<String> mappedItems, Map< String, List<String>, GroupCallback<List<MappedItem>>, List<String> callback) {
-    	//to do
-    	
-    			List<MappedItem> = 
-    	        Map<String, List<String>> groupedList = new HashMap<String, List<String>>();
-    	        for(String file: filesThatHaveWord) {
-    	            Integer occurrences = groupedList.get(file);
-    	            if (occurrences == null) {
-    	            	groupedList.put(file, 1);
-    	            } else {
-    	            	groupedList.put(file, occurrences.intValue() + 1);
-    	            }
-    	        }
-    	        callback.reduceDone(word, reducedList);
+    public static interface GroupCallback<E> {
+        public void groupDone(String v, List<String> k);
+    }
+
+    public static void group(String word, String file,  List<String> list, GroupCallback<Map<String, List<String>>> groupCallback) {
+
+        if (list == null) {
+            list = new LinkedList<String>();
+        }
+        list.add(file);
+        groupCallback.groupDone(word, list);
     }
 
     public static void reduce(String word, List<String> list, ReduceCallback<String, String, Integer> callback) {
