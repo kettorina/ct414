@@ -108,9 +108,9 @@ public class assign2group {
             long startTime = System.nanoTime();
             Map<String, List<String>> groupedItems = new HashMap<String, List<String>>();
             
-            final GroupCallback<List<MappedItem>> groupCallback = new GroupCallback<List<MappedItem>>() {
+            final GroupCallback<Map<String, List<String>>> groupCallback = new GroupCallback<Map<String, List<String>>>() {
                 @Override
-                public synchronized void groupDone(String k, Map<String, Integer> v) {
+                public synchronized void groupDone(String k , List<String> v) {
                     output.put(k, v);
                 }
             };
@@ -128,10 +128,10 @@ public class assign2group {
                 MappedItem item = mappedIter.next();
                 String word = item.getWord();
                 String file = item.getFile();
-                List<String> list = mappedItems.get(word);
+                List<String> list = groupedItems.get(word);
                 if (list == null) {
                     list = new LinkedList<String>();
-                    mappedItems.put(word, list);
+                    groupedItems.put(word, list);
                 }
                 
                 executor.submit(() -> {
